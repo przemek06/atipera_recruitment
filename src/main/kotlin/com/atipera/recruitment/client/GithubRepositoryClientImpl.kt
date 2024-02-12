@@ -134,7 +134,6 @@ class GithubRepositoryClientImpl(
     private fun lastPageNumber(response: RestClient.ResponseSpec): Int {
         val linkHeader = response.toBodilessEntity().headers[LINK_HEADER_KEY]?.get(0)
             ?: throw ExternalAPIException(LINK_HEADER_ERROR_MSG)
-        println(linkHeader)
         val matchResult = LINK_REGEX.toRegex().find(linkHeader)
         val pageNumber = matchResult?.groups?.get(1)?.value?.toIntOrNull()
 
