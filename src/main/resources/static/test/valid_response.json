@@ -1,0 +1,25 @@
+{
+  "repositories": [
+    {
+      "repositoryName": "repo1",
+      "ownerLogin": "username",
+      "branches": [
+        {
+          "name": "branch1",
+          "lastCommitSha": "sha1"
+        }
+      ]
+    },
+    {
+      "repositoryName": "repo2",
+      "ownerLogin": "username",
+      "branches": [
+        {
+          "name": "branch2",
+          "lastCommitSha": "sha2"
+        }
+      ]
+    }
+  ]
+}
+

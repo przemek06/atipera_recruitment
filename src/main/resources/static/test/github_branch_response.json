@@ -1,0 +1,8 @@
+[
+  {
+    "name": "branch1",
+    "commit": {
+      "sha": "sha1"
+    }
+  }
+]

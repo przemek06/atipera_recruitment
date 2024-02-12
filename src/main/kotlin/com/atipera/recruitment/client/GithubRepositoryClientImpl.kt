@@ -9,9 +9,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import jakarta.annotation.PostConstruct
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.*
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -23,29 +21,27 @@ import org.springframework.web.client.RestClient
 import org.springframework.web.util.UriComponentsBuilder
 import java.net.URI
 
-const val URI_SCHEME = "https"
-const val GITHUB_API_HOST = "api.github.com"
-const val GITHUB_API_REPOSITORY_PATH = "users/%s/repos"
-const val GITHUB_API_BRANCH_PATH = "repos/%s/%s/branches"
-const val USER_NOT_FOUND_ERROR_MSG = "There is no user such as %s."
-const val REPOSITORY_NOT_FOUND_ERROR_MSG = "There is no such repository as %s."
-const val API_RATE_EXCEEDED_ERROR_MSG = "API rate limit was exceeded."
-const val LINK_HEADER_ERROR_MSG = "Link header value is not found in the API response."
-const val LINK_HEADER_FORMAT_ERROR_MSG = "Link header value is in the wrong format in the API response"
-const val WRONG_API_RETURN_TYPE_ERROR_MSG =
+private const val URI_SCHEME = "https"
+private const val GITHUB_API_HOST = "api.github.com"
+private const val GITHUB_API_REPOSITORY_PATH = "users/%s/repos"
+private const val GITHUB_API_BRANCH_PATH = "repos/%s/%s/branches"
+private const val REPOSITORY_NOT_FOUND_ERROR_MSG = "Repository %s"
+private const val LINK_HEADER_ERROR_MSG = "Link header value is not found in the API response."
+private const val LINK_HEADER_FORMAT_ERROR_MSG = "Link header value is in the wrong format in the API response"
+private const val WRONG_API_RETURN_TYPE_ERROR_MSG =
     "Objects returned from the Github API are in the wrong format. Underlying cause: [%s]"
-const val LINK_HEADER_KEY = "Link"
-const val LINK_REGEX = """.*page=(\d+)>; rel="last".*"""
-const val PAGE_PARAM_KEY = "page"
-const val PER_PAGE_PARAM_KEY = "per_page"
-const val PER_PAGE_PARAM_VALUE = "100"
+private const val LINK_REGEX = """.*page=(\d+)>; rel="last".*"""
+private const val PAGE_PARAM_KEY = "page"
+private const val PER_PAGE_PARAM_KEY = "per_page"
 
 @Component
-class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRepositoryClient() {
+class GithubRepositoryClientImpl(
+    val coroutineScope: CoroutineScope,
+    val restClient: RestClient = RestClient.create(),
+    val objectMapper: ObjectMapper = ObjectMapper().registerKotlinModule()
+) : GithubRepositoryClient() {
 
     val logger: Logger = LoggerFactory.getLogger(GithubRepositoryClientImpl::class.java)
-    val restClient = RestClient.create()
-    val objectMapper = ObjectMapper().registerKotlinModule()
 
     @PostConstruct
     fun init() {
@@ -68,7 +64,7 @@ class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRep
 
     override suspend fun getRepositoryBranches(repositoryName: String, ownerLogin: String): List<APIBranchDTO> {
         val params = constructDefaultParams()
-        params[PER_PAGE_PARAM_KEY] = mutableListOf(PER_PAGE_PARAM_VALUE)
+        params[PER_PAGE_PARAM_KEY] = listOf(PER_PAGE_PARAM_VALUE)
         val uri = constructURI(GITHUB_API_BRANCH_PATH, params, ownerLogin, repositoryName)
         val response = getResponse(uri, REPOSITORY_NOT_FOUND_ERROR_MSG.format("$ownerLogin/$repositoryName"))
         val branches = extractBranchesFromResponse(response)
@@ -92,7 +88,7 @@ class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRep
 
     private fun constructDefaultParams(): MultiValueMap<String, String> {
         val params = LinkedMultiValueMap<String, String>()
-        params[PER_PAGE_PARAM_KEY] = mutableListOf(PER_PAGE_PARAM_VALUE)
+        params[PER_PAGE_PARAM_KEY] = listOf(PER_PAGE_PARAM_VALUE)
         return params
     }
 
@@ -138,6 +134,7 @@ class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRep
     private fun lastPageNumber(response: RestClient.ResponseSpec): Int {
         val linkHeader = response.toBodilessEntity().headers[LINK_HEADER_KEY]?.get(0)
             ?: throw ExternalAPIException(LINK_HEADER_ERROR_MSG)
+        println(linkHeader)
         val matchResult = LINK_REGEX.toRegex().find(linkHeader)
         val pageNumber = matchResult?.groups?.get(1)?.value?.toIntOrNull()
 
@@ -148,13 +145,12 @@ class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRep
         val deferredResponses = (2..lastPageNumber).map { page ->
             coroutineScope.async {
                 val params = constructDefaultParams()
-                params[PAGE_PARAM_KEY] = mutableListOf(page.toString())
+                params[PAGE_PARAM_KEY] = listOf(page.toString())
                 val uri = constructURI(GITHUB_API_REPOSITORY_PATH, params, ownerLogin)
                 val response = getResponse(uri, USER_NOT_FOUND_ERROR_MSG.format(ownerLogin))
                 return@async extractRepositoriesFromResponse(response)
             }
         }
-
         return deferredResponses.awaitAll().flatten()
     }
 
@@ -166,7 +162,7 @@ class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRep
         val deferredResponses = (2..lastPageNumber).map { page ->
             coroutineScope.async {
                 val params = constructDefaultParams()
-                params[PAGE_PARAM_KEY] = mutableListOf(page.toString())
+                params[PAGE_PARAM_KEY] = listOf(page.toString())
                 val uri = constructURI(GITHUB_API_BRANCH_PATH, params, ownerLogin, repositoryName)
                 val response = getResponse(uri, REPOSITORY_NOT_FOUND_ERROR_MSG.format("$ownerLogin/$repositoryName"))
                 return@async extractBranchesFromResponse(response)
@@ -175,4 +171,12 @@ class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRep
 
         return deferredResponses.awaitAll().flatten()
     }
+
+    companion object {
+        const val LINK_HEADER_KEY = "Link"
+        const val USER_NOT_FOUND_ERROR_MSG = "User %s"
+        const val API_RATE_EXCEEDED_ERROR_MSG = "API rate limit was exceeded."
+        const val PER_PAGE_PARAM_VALUE = "100"
+    }
+
 }

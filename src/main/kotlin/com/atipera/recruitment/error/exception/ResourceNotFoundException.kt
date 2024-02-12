@@ -1,3 +1,5 @@
 package com.atipera.recruitment.error.exception
 
-class ResourceNotFoundException (message: String) : Exception(message)
+private const val ERROR_MSG = "Resource was not found: %s"
+
+class ResourceNotFoundException (message: String) : Exception(ERROR_MSG.format(message))

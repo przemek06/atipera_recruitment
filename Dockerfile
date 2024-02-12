@@ -5,7 +5,7 @@ WORKDIR /build/
 COPY pom.xml .
 RUN mvn dependency:go-offline
 COPY ./src ./src
-RUN mvn clean install -Dmaven.test.skip=true
+RUN mvn clean install
 
 #Stage 2
 FROM eclipse-temurin:17-jdk

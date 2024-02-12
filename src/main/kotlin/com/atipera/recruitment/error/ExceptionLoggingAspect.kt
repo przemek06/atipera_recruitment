@@ -15,6 +15,6 @@ class ExceptionLoggingAspect {
     @AfterThrowing(pointcut = "execution(* com.atipera.recruitment..*.*(..))", throwing = "ex")
     fun logException(joinPoint: JoinPoint, ex: Throwable) {
         val methodSignature = joinPoint.signature as MethodSignature
-        logger.warn("Exception occurred in class ${methodSignature.declaringType} at method ${methodSignature.method.name} with cause: [\n${ex.message}]", ex)
+        logger.warn("Exception occurred in class ${methodSignature.declaringType} at method ${methodSignature.method.name} with cause: \n[${ex.message}]", ex)
     }
 }
