@@ -1,10 +1,10 @@
 package com.atipera.recruitment.service
 
 import com.atipera.recruitment.client.GithubRepositoryClient
-import com.atipera.recruitment.dto.api.APIBranchDTO
-import com.atipera.recruitment.dto.api.APICommitDTO
-import com.atipera.recruitment.dto.api.APIOwnerDTO
-import com.atipera.recruitment.dto.api.APIRepositoryDTO
+import com.atipera.recruitment.dto.github.APIBranchDTO
+import com.atipera.recruitment.dto.github.APICommitDTO
+import com.atipera.recruitment.dto.github.APIOwnerDTO
+import com.atipera.recruitment.dto.github.APIRepositoryDTO
 import com.atipera.recruitment.error.exception.ExternalAPIException
 import com.atipera.recruitment.error.exception.ResourceNotFoundException
 import io.mockk.coEvery
@@ -37,7 +37,7 @@ class RepositoryServiceImplTest {
     fun setUp() {
         githubRepositoryClient = mockk()
         coroutineScope = CoroutineScope(Dispatchers.Default)
-        repositoryService = GithubRepositoryServiceImpl(githubRepositoryClient, coroutineScope)
+        repositoryService = GithubRepositoryService(githubRepositoryClient, coroutineScope)
     }
 
     @AfterEach

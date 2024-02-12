@@ -1,8 +1,8 @@
 package com.atipera.recruitment.service
 
 import com.atipera.recruitment.client.GithubRepositoryClient
-import com.atipera.recruitment.dto.api.APIBranchDTO
-import com.atipera.recruitment.dto.api.APIRepositoryDTO
+import com.atipera.recruitment.dto.github.APIBranchDTO
+import com.atipera.recruitment.dto.github.APIRepositoryDTO
 import com.atipera.recruitment.dto.out.BranchDTO
 import com.atipera.recruitment.dto.out.RepositoryDTO
 import com.atipera.recruitment.dto.out.RepositoryListDTO
@@ -10,7 +10,7 @@ import kotlinx.coroutines.*
 import org.springframework.stereotype.Service
 
 @Service
-class GithubRepositoryServiceImpl(
+class GithubRepositoryService(
     val githubRepositoryClient: GithubRepositoryClient,
     val coroutineScope: CoroutineScope
 ) : RepositoryService() {

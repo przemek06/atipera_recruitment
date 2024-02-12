@@ -1,4 +1,4 @@
-package com.atipera.recruitment.dto.api
+package com.atipera.recruitment.dto.github
 
 data class APIBranchDTO (
     val name: String,

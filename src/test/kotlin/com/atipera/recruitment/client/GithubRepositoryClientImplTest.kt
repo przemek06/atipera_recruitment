@@ -1,10 +1,10 @@
 package com.atipera.recruitment.client
 
 import com.atipera.recruitment.client.GithubRepositoryClientImpl.Companion.PER_PAGE_PARAM_VALUE
-import com.atipera.recruitment.dto.api.APIBranchDTO
-import com.atipera.recruitment.dto.api.APICommitDTO
-import com.atipera.recruitment.dto.api.APIOwnerDTO
-import com.atipera.recruitment.dto.api.APIRepositoryDTO
+import com.atipera.recruitment.dto.github.APIBranchDTO
+import com.atipera.recruitment.dto.github.APICommitDTO
+import com.atipera.recruitment.dto.github.APIOwnerDTO
+import com.atipera.recruitment.dto.github.APIRepositoryDTO
 import io.mockk.every
 import io.mockk.mockk
 import io.mockk.unmockkAll
