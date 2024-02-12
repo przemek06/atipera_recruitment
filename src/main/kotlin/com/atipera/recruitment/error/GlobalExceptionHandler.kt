@@ -21,7 +21,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(ExternalAPIException::class)
     fun handleExternalAPIException(ex: ExternalAPIException) : ResponseEntity<ErrorDTO> {
-        val status = HttpStatus.INTERNAL_SERVER_ERROR
+        val status = HttpStatus.SERVICE_UNAVAILABLE
         return ResponseEntity
             .status(status)
             .body(ErrorDTO(status.value(), ex.message))

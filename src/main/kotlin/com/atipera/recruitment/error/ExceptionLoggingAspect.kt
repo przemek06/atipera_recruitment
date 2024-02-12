@@ -3,6 +3,7 @@ package com.atipera.recruitment.error
 import org.aspectj.lang.JoinPoint
 import org.aspectj.lang.annotation.AfterThrowing
 import org.aspectj.lang.annotation.Aspect
+import org.aspectj.lang.reflect.MethodSignature
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Component
 
@@ -13,6 +14,7 @@ class ExceptionLoggingAspect {
 
     @AfterThrowing(pointcut = "execution(* com.atipera.recruitment..*.*(..))", throwing = "ex")
     fun logException(joinPoint: JoinPoint, ex: Throwable) {
-        logger.error("Exception occurred in ${joinPoint.signature.declaringType} with cause: \n${ex.message}", ex)
+        val methodSignature = joinPoint.signature as MethodSignature
+        logger.warn("Exception occurred in class ${methodSignature.declaringType} at method ${methodSignature.method.name} with cause: [\n${ex.message}]", ex)
     }
 }

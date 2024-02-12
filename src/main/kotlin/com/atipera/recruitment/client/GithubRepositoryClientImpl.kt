@@ -8,7 +8,10 @@ import com.fasterxml.jackson.core.type.TypeReference
 import com.fasterxml.jackson.databind.DeserializationFeature
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.registerKotlinModule
-import kotlinx.coroutines.*
+import jakarta.annotation.PostConstruct
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
@@ -24,12 +27,13 @@ const val URI_SCHEME = "https"
 const val GITHUB_API_HOST = "api.github.com"
 const val GITHUB_API_REPOSITORY_PATH = "users/%s/repos"
 const val GITHUB_API_BRANCH_PATH = "repos/%s/%s/branches"
-const val USER_NOT_FOUND_ERROR_MSG = "There is no such user account."
-const val REPOSITORY_NOT_FOUND_ERROR_MSG = "There is no such repository."
+const val USER_NOT_FOUND_ERROR_MSG = "There is no user such as %s."
+const val REPOSITORY_NOT_FOUND_ERROR_MSG = "There is no such repository as %s."
 const val API_RATE_EXCEEDED_ERROR_MSG = "API rate limit was exceeded."
 const val LINK_HEADER_ERROR_MSG = "Link header value is not found in the API response."
 const val LINK_HEADER_FORMAT_ERROR_MSG = "Link header value is in the wrong format in the API response"
-const val WRONG_API_RETURN_TYPE_ERROR_MSG = "Objects returned from the API are in the wrong format"
+const val WRONG_API_RETURN_TYPE_ERROR_MSG =
+    "Objects returned from the Github API are in the wrong format. Underlying cause: [%s]"
 const val LINK_HEADER_KEY = "Link"
 const val LINK_REGEX = """.*page=(\d+)>; rel="last".*"""
 const val PAGE_PARAM_KEY = "page"
@@ -37,15 +41,21 @@ const val PER_PAGE_PARAM_KEY = "per_page"
 const val PER_PAGE_PARAM_VALUE = "100"
 
 @Component
-class GithubRepositoryClientImpl : GithubRepositoryClient() {
+class GithubRepositoryClientImpl(val coroutineScope: CoroutineScope) : GithubRepositoryClient() {
 
     val logger: Logger = LoggerFactory.getLogger(GithubRepositoryClientImpl::class.java)
     val restClient = RestClient.create()
+    val objectMapper = ObjectMapper().registerKotlinModule()
+
+    @PostConstruct
+    fun init() {
+        objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
+    }
 
     override suspend fun getUserRepositories(ownerLogin: String): List<APIRepositoryDTO> {
         val params = constructDefaultParams()
-        val uri = constructURI(GITHUB_API_REPOSITORY_PATH, listOf(ownerLogin), params)
-        val response = getResponse(uri, USER_NOT_FOUND_ERROR_MSG)
+        val uri = constructURI(GITHUB_API_REPOSITORY_PATH, params, ownerLogin)
+        val response = getResponse(uri, USER_NOT_FOUND_ERROR_MSG.format(ownerLogin))
         val repositories = extractRepositoriesFromResponse(response)
 
         val resultRepositories = if (isMorePages(response)) {
@@ -59,8 +69,8 @@ class GithubRepositoryClientImpl : GithubRepositoryClient() {
     override suspend fun getRepositoryBranches(repositoryName: String, ownerLogin: String): List<APIBranchDTO> {
         val params = constructDefaultParams()
         params[PER_PAGE_PARAM_KEY] = mutableListOf(PER_PAGE_PARAM_VALUE)
-        val uri = constructURI(GITHUB_API_BRANCH_PATH, listOf(ownerLogin, repositoryName), params)
-        val response = getResponse(uri, REPOSITORY_NOT_FOUND_ERROR_MSG)
+        val uri = constructURI(GITHUB_API_BRANCH_PATH, params, ownerLogin, repositoryName)
+        val response = getResponse(uri, REPOSITORY_NOT_FOUND_ERROR_MSG.format("$ownerLogin/$repositoryName"))
         val branches = extractBranchesFromResponse(response)
 
         val resultBranches = if (isMorePages(response)) {
@@ -71,15 +81,13 @@ class GithubRepositoryClientImpl : GithubRepositoryClient() {
         return resultBranches
     }
 
-    private fun constructURI(path: String, pathParams: List<String>, params: MultiValueMap<String, String>): URI {
-        return UriComponentsBuilder
-            .newInstance()
-            .scheme(URI_SCHEME)
-            .host(GITHUB_API_HOST)
-            .path(path.format(pathParams.getOrNull(0), pathParams.getOrNull(1)))
-            .queryParams(params)
-            .build()
-            .toUri()
+    private fun constructURI(path: String, params: MultiValueMap<String, String>, vararg pathParams: String): URI {
+        return UriComponentsBuilder.newInstance().apply {
+            scheme(URI_SCHEME)
+            host(GITHUB_API_HOST)
+            path(path.format(*pathParams))
+            queryParams(params)
+        }.build().toUri()
     }
 
     private fun constructDefaultParams(): MultiValueMap<String, String> {
@@ -89,31 +97,29 @@ class GithubRepositoryClientImpl : GithubRepositoryClient() {
     }
 
     private suspend fun getResponse(uri: URI, notFoundErrorMsg: String): RestClient.ResponseSpec {
-            logger.info("Request sent to uri: $uri")
-            return restClient.get()
-                .uri(uri)
-                .accept(MediaType.APPLICATION_JSON)
-                .retrieve()
-                .onStatus(
-                    { it.isSameCodeAs(HttpStatus.NOT_FOUND) },
-                    { _, _ -> throw ResourceNotFoundException(notFoundErrorMsg) }
-                )
-                .onStatus(
-                    { it.isSameCodeAs(HttpStatus.FORBIDDEN) or it.isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS) },
-                    { _, _ -> throw ExternalAPIException(API_RATE_EXCEEDED_ERROR_MSG) }
-                )
-        }
+        logger.debug("Request sent to uri: {}", uri)
+        return restClient.get()
+            .uri(uri)
+            .accept(MediaType.APPLICATION_JSON)
+            .retrieve()
+            .onStatus(
+                { it.isSameCodeAs(HttpStatus.NOT_FOUND) },
+                { _, _ -> throw ResourceNotFoundException(notFoundErrorMsg) }
+            )
+            .onStatus(
+                { it.isSameCodeAs(HttpStatus.FORBIDDEN) or it.isSameCodeAs(HttpStatus.TOO_MANY_REQUESTS) },
+                { _, _ -> throw ExternalAPIException(API_RATE_EXCEEDED_ERROR_MSG) }
+            )
+    }
 
     private inline fun <reified T> extractDTOsFromResponse(response: RestClient.ResponseSpec): List<T> {
-        try {
-            val objectMapper = ObjectMapper().registerKotlinModule()
-            objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
-            val jsonString = response.body(String::class.java)
-            val responseList = objectMapper.readValue(jsonString, object : TypeReference<List<T>>() {})
+        val jsonString = response.body(String::class.java)
 
-            return responseList
-        } catch (e: ClassCastException) {
-            throw ExternalAPIException(WRONG_API_RETURN_TYPE_ERROR_MSG)
+        return kotlin.runCatching {
+            val responseList = objectMapper.readValue(jsonString, object : TypeReference<List<T>>() {})
+            responseList
+        }.getOrElse {
+            throw ExternalAPIException(WRONG_API_RETURN_TYPE_ERROR_MSG.format(it.message))
         }
     }
 
@@ -140,11 +146,11 @@ class GithubRepositoryClientImpl : GithubRepositoryClient() {
 
     private suspend fun getAllRepositoryPages(ownerLogin: String, lastPageNumber: Int): List<APIRepositoryDTO> {
         val deferredResponses = (2..lastPageNumber).map { page ->
-            CoroutineScope(Dispatchers.IO).async {
+            coroutineScope.async {
                 val params = constructDefaultParams()
                 params[PAGE_PARAM_KEY] = mutableListOf(page.toString())
-                val uri = constructURI(GITHUB_API_REPOSITORY_PATH, listOf(ownerLogin), params)
-                val response = getResponse(uri, USER_NOT_FOUND_ERROR_MSG)
+                val uri = constructURI(GITHUB_API_REPOSITORY_PATH, params, ownerLogin)
+                val response = getResponse(uri, USER_NOT_FOUND_ERROR_MSG.format(ownerLogin))
                 return@async extractRepositoriesFromResponse(response)
             }
         }
@@ -158,11 +164,11 @@ class GithubRepositoryClientImpl : GithubRepositoryClient() {
         lastPageNumber: Int
     ): List<APIBranchDTO> {
         val deferredResponses = (2..lastPageNumber).map { page ->
-            CoroutineScope(Dispatchers.IO).async {
+            coroutineScope.async {
                 val params = constructDefaultParams()
                 params[PAGE_PARAM_KEY] = mutableListOf(page.toString())
-                val uri = constructURI(GITHUB_API_BRANCH_PATH, listOf(ownerLogin, repositoryName), params)
-                val response = getResponse(uri, REPOSITORY_NOT_FOUND_ERROR_MSG)
+                val uri = constructURI(GITHUB_API_BRANCH_PATH, params, ownerLogin, repositoryName)
+                val response = getResponse(uri, REPOSITORY_NOT_FOUND_ERROR_MSG.format("$ownerLogin/$repositoryName"))
                 return@async extractBranchesFromResponse(response)
             }
         }

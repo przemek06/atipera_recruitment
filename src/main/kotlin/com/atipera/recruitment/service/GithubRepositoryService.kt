@@ -6,12 +6,16 @@ import com.atipera.recruitment.dto.api.APIRepositoryDTO
 import com.atipera.recruitment.dto.out.BranchDTO
 import com.atipera.recruitment.dto.out.RepositoryDTO
 import com.atipera.recruitment.dto.out.RepositoryListDTO
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.runBlocking
 import org.springframework.stereotype.Service
 
 @Service
 class GithubRepositoryService(
-    val githubRepositoryClient: GithubRepositoryClient
+    val githubRepositoryClient: GithubRepositoryClient,
+    val coroutineScope: CoroutineScope
 ) {
 
     fun getUserRepositories(ownerLogin: String): RepositoryListDTO = runBlocking {
@@ -26,7 +30,7 @@ class GithubRepositoryService(
 
     private suspend fun getRepositoryBranchesMap(apiRepositories: List<APIRepositoryDTO>): Map<APIRepositoryDTO, List<APIBranchDTO>> {
         val deferredBranches = apiRepositories.map {
-            CoroutineScope(Dispatchers.IO).async {
+            coroutineScope.async {
                 getAPIBranchesByRepositoryNameAndOwner(it.name, it.owner.login)
             }
         }
