@@ -10,12 +10,12 @@ import kotlinx.coroutines.*
 import org.springframework.stereotype.Service
 
 @Service
-class GithubRepositoryService(
+class GithubRepositoryServiceImpl(
     val githubRepositoryClient: GithubRepositoryClient,
     val coroutineScope: CoroutineScope
-) {
+) : RepositoryService() {
 
-    fun getUserRepositories(ownerLogin: String): RepositoryListDTO = runBlocking {
+    override fun getUserRepositories(ownerLogin: String): RepositoryListDTO = runBlocking {
         val apiRepositories = githubRepositoryClient
             .getUserRepositories(ownerLogin)
             .filter { !it.fork }

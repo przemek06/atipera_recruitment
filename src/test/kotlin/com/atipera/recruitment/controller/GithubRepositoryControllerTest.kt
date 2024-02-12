@@ -7,7 +7,7 @@ import com.atipera.recruitment.dto.out.RepositoryDTO
 import com.atipera.recruitment.dto.out.RepositoryListDTO
 import com.atipera.recruitment.error.exception.ExternalAPIException
 import com.atipera.recruitment.error.exception.ResourceNotFoundException
-import com.atipera.recruitment.service.GithubRepositoryService
+import com.atipera.recruitment.service.RepositoryService
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
@@ -45,12 +45,12 @@ class GithubRepositoryControllerTest(
     private val resourceLoader: ResourceLoader = DefaultResourceLoader()
 
     @MockBean
-    private lateinit var githubRepositoryService: GithubRepositoryService
+    private lateinit var repositoryService: RepositoryService
 
     @Test
     fun testGetUserRepositories_ValidUserWithRepositories() {
         // given
-        `when`(githubRepositoryService.getUserRepositories(LOGIN)).thenReturn(mockUserRepositories())
+        `when`(repositoryService.getUserRepositories(LOGIN)).thenReturn(mockUserRepositories())
         val expectedResponse = resourceLoader.getResource(VALID_JSON_RESPONSE_PATH).getContentAsString(
                 Charset.defaultCharset()
             )
@@ -70,7 +70,7 @@ class GithubRepositoryControllerTest(
     @Test
     fun testGetUserRepositories_WrongAcceptContentType() {
         // given
-        `when`(githubRepositoryService.getUserRepositories(LOGIN)).thenReturn(mockUserRepositories())
+        `when`(repositoryService.getUserRepositories(LOGIN)).thenReturn(mockUserRepositories())
 
         // when
         val exchange = mockMvc.perform(
@@ -85,7 +85,7 @@ class GithubRepositoryControllerTest(
     @Test
     fun testGetUserRepositories_UserNotFound() {
         // given
-        `when`(githubRepositoryService.getUserRepositories(LOGIN)).then { throw ResourceNotFoundException(USER_NOT_FOUND_ERROR_MSG.format(LOGIN)) }
+        `when`(repositoryService.getUserRepositories(LOGIN)).then { throw ResourceNotFoundException(USER_NOT_FOUND_ERROR_MSG.format(LOGIN)) }
         val expectedResponse = resourceLoader.getResource(NOT_FOUND_JSON_RESPONSE_PATH).getContentAsString(
                 Charset.defaultCharset()
             )
@@ -105,7 +105,7 @@ class GithubRepositoryControllerTest(
     @Test
     fun testGetUserRepositories_APICallRateExceeded() {
         // given
-        `when`(githubRepositoryService.getUserRepositories(LOGIN)).then {
+        `when`(repositoryService.getUserRepositories(LOGIN)).then {
             throw ExternalAPIException(API_RATE_EXCEEDED_ERROR_MSG)
         }
 

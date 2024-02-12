@@ -27,17 +27,17 @@ private const val BRANCH_NAME_2 = "branch2"
 private const val COMMIT_SHA_1 = "sha1"
 private const val COMMIT_SHA_2 = "sha2"
 
-class GithubRepositoryServiceTest {
+class RepositoryServiceImplTest {
 
     private lateinit var githubRepositoryClient: GithubRepositoryClient
     private lateinit var coroutineScope: CoroutineScope
-    private lateinit var githubRepositoryService: GithubRepositoryService
+    private lateinit var repositoryService: RepositoryService
 
     @BeforeEach
     fun setUp() {
         githubRepositoryClient = mockk()
         coroutineScope = CoroutineScope(Dispatchers.Default)
-        githubRepositoryService = GithubRepositoryService(githubRepositoryClient, coroutineScope)
+        repositoryService = GithubRepositoryServiceImpl(githubRepositoryClient, coroutineScope)
     }
 
     @AfterEach
@@ -69,7 +69,7 @@ class GithubRepositoryServiceTest {
         )
 
         // when
-        val repositoryList = githubRepositoryService.getUserRepositories(LOGIN)
+        val repositoryList = repositoryService.getUserRepositories(LOGIN)
 
         // then
         assertEquals(2, repositoryList.repositories.size)
@@ -92,7 +92,7 @@ class GithubRepositoryServiceTest {
         coEvery { githubRepositoryClient.getUserRepositories(LOGIN) } returns emptyList()
 
         // when
-        val repositoryList = githubRepositoryService.getUserRepositories(LOGIN)
+        val repositoryList = repositoryService.getUserRepositories(LOGIN)
 
         // then
         assertEquals(0, repositoryList.repositories.size)
@@ -105,7 +105,7 @@ class GithubRepositoryServiceTest {
 
         // then
         assertThrows<ResourceNotFoundException> {
-            githubRepositoryService.getUserRepositories(LOGIN)
+            repositoryService.getUserRepositories(LOGIN)
         }
     }
 
@@ -116,7 +116,7 @@ class GithubRepositoryServiceTest {
 
         // then
         assertThrows<ExternalAPIException> {
-            githubRepositoryService.getUserRepositories(LOGIN)
+            repositoryService.getUserRepositories(LOGIN)
         }
     }
 
